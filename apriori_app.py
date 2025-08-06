@@ -1,24 +1,35 @@
+# apriori_app.py
 import pandas as pd
 import os
 from mlxtend.frequent_patterns import apriori, association_rules
 from sklearn.preprocessing import MultiLabelBinarizer
-import sys
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton,
-                             QTextEdit, QFileDialog, QLabel, QMessageBox, QLineEdit, QFormLayout)
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QPushButton,
+                             QTextEdit, QFileDialog, QLabel, QMessageBox, QLineEdit, QFormLayout,QApplication)
+from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt, pyqtSignal
 import io
 import contextlib
 
 class AprioriApp(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.initUI()
+    closed = pyqtSignal()  # 自定义信号，用于窗口关闭时通知
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.file_paths = []
         self.data_dir = None
+        self.initUI()
 
     def initUI(self):
         self.setWindowTitle('商品关联性分析工具')
         self.setGeometry(100, 100, 800, 600)
+
+        # 设置窗口图标
+        icon_path = os.path.join(os.path.dirname(__file__), 'icons', 'app_icon.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        else:
+            fallback_icon = 'C:\\Windows\\System32\\shell32.dll,4'
+            self.setWindowIcon(QIcon(fallback_icon))
 
         # 主布局
         central_widget = QWidget()
@@ -49,6 +60,11 @@ class AprioriApp(QMainWindow):
         self.run_button.clicked.connect(self.run_analysis)
         layout.addWidget(self.run_button)
 
+        # 返回按钮
+        self.back_button = QPushButton('返回主菜单', self)
+        self.back_button.clicked.connect(self.close)
+        layout.addWidget(self.back_button)
+
         # 日志输出窗口
         self.log_text = QTextEdit(self)
         self.log_text.setReadOnly(True)
@@ -56,6 +72,11 @@ class AprioriApp(QMainWindow):
 
         # 状态栏
         self.statusBar().showMessage('就绪')
+
+    def closeEvent(self, event):
+        self.closed.emit()  # 发出关闭信号
+        event.accept()
+
 
     def select_files(self):
         files, _ = QFileDialog.getOpenFileNames(
@@ -341,7 +362,7 @@ class AprioriApp(QMainWindow):
                     if not rules.empty:
                         self.log(str(rules[['antecedents', 'consequents', 'support', 'confidence', 'lift', '前件商品名称', '后件商品名称', '单量']].sort_values(by='confidence', ascending=False)))
                         # 保存关联规则到Excel
-                        rules_output_file = os.path.join(self.data_dir, 'association_rules.xlsx')
+                        rules_output_file = os.path.join(self.data_dir, '最终结果_association_rules.xlsx')
                         rules.to_excel(rules_output_file, index=False, engine='openpyxl')
                         self.log(f"\n关联规则已保存到：{rules_output_file}")
                     else:
@@ -361,9 +382,3 @@ class AprioriApp(QMainWindow):
             self.log(f"错误：{str(e)}")
         except Exception as e:
             self.log(f"处理文件 {merged_file} 时发生错误: {str(e)}")
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    window = AprioriApp()
-    window.show()
-    sys.exit(app.exec_())
